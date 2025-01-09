@@ -3,6 +3,5 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdint.h>
-typedef unsigned long uint;
 
 #endif

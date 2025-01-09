@@ -1,18 +1,28 @@
-CC=riscv64-linux-gnu-gcc
-AS=riscv64-linux-gnu-as
-OBJ_COPY=riscv64-linux-gnu-objcopy
-CFLAGS = -Wall -g -O1
-CFLAGS+=-march=rv64gc -mabi=lp64d 
-LD_FLAGS =  -nostartfiles 
-SRC_DIR = src
-INCL_DIR += -Iinc
 
+CC=riscv64-linux-gnu-gcc
+CC=riscv64-unknown-linux-gnu-gcc
+CC=riscv64-unknown-elf-gcc
+AS=riscv64-linux-gnu-as
+AS=riscv64-unknown-elf-as
+OBJ_COPY=riscv64-linux-gnu-objcopy
+
+CFLAGS = -Wall -g -O1
+CFLAGS+=-march=rv64gc -mabi=lp64d
+LD_FLAGS =  -nostartfiles -T config/link.ld 
+
+SRC_DIR = src
+INCL_DIR += -Iinc 
+#		    -IthreadX_inc
 BDIR = build
 
-SRC += $(SRC_DIR)/init_mem.c \
-	   $(SRC_DIR)/main.c \
-	   $(SRC_DIR)/gpio.c \
-	   $(NULL)
+include build_env.mak
+
+
+ifeq ($(BUILT_THREADX_OS),1)
+	CFLAGS+= -DThreadOS
+	INCL_DIR += -IthreadX_inc
+	ADD_LIB = -l$(LIB)
+endif
 
 OBJ = $(SRC:.c=.o)
 
@@ -20,24 +30,31 @@ TARGET = $(BDIR)/firmware.elf
 TARGET_BIN = $(BDIR)/firmware.bin
 TARGET_IMG = $(BDIR)/firmware.img
 
-all: clean $(OBJ) $(TARGET) $(TARGET_BIN) $(TARGET_IMG)
+all: clean $(OBJ) $(TARGET) $(TARGET_BIN) $(TARGET_IMG) flash
 
 $(OBJ): %.o: %.c
-	$(CC) $(CFLAGS) $(INCL_DIR) -c $< -o $@
+	$(CC) $(CFLAGS) $(INCL_DIR) $(ADD_LIB) -c $< -o $@
 
-Start.o: startup/Start.s
+startup/Start.o: startup/Start.s
 	$(AS)  $< -c -o $@
 
-$(TARGET): Start.o $(OBJ)
+#startup/tx_initialize_low_level.o: startup/tx_initialize_low_level.S
+#	$(AS)  $< -c -o $@
+
+$(TARGET): startup/Start.o $(OBJ)
 	mkdir -p $(BDIR)
-	$(CC) $(CFLAGS)  $(LD_FLAGS) -T link.ld $^ -o $@ $(INCL_DIR) 
+	$(CC) $(CFLAGS) $(LD_FLAGS) $^ -o $@ -I$(INCL_DIR)
 
 $(TARGET_BIN):$(TARGET)
 	$(OBJ_COPY) $< -O binary $@
 
 $(TARGET_IMG):$(TARGET_BIN)
-	/home/employee/sifive/bare_metal/blog-code/2-baremetal-visionfive/tools/vf2-imager/vf2-imager -i $< -o $@
+	../blog-code/2-baremetal-visionfive/tools/vf2-imager/vf2-imager -i $< -o $@
+
+flash:
+	../blog-code/2-baremetal-visionfive/tools/vf2/vf2 $(TARGET_IMG)
 
 clean:
 	rm -rf $(OBJ)
 	rm -rf $(BDIR)
+	rm -rf startup/Start.o

@@ -4,7 +4,8 @@ SECTIONS
 {
     .text 0x40000000 : {
         KEEP(*(.text.boot))  
-        *(.text*) 
+        *(.text*)
+       lib/libthreadx.a	
         . = ALIGN(8);
     }
     .rodata : {
